@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app: myloadbalancer
+spec:
+  ports:
+  - port: 38412
+    name: loadbalancer
+  clusterIP: None
+  selector:
+    app: myloadbalancer
+---    
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: myloadbalancer
+  name: {{ .Release.Name }}
+spec:
+  serviceName: {{ .Release.Name }}
+  podManagementPolicy: Parallel
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myloadbalancer
+  template:
+    metadata:
+      annotations:
+         k8s.v1.cni.cncf.io/networks: '[
+                 { "name": "core5g-def",
+                   "ips": [ {{- cat .Values.myloadbalancer.multusTrafficIP "/" .Values.myloadbalancer.multusTrafficnetMask | nospace | quote }} ] }
+         ]'
+      labels:
+        app: myloadbalancer
+    spec:
+      serviceAccountName: lb-service-account  # Add this line
+      containers:
+      - name: myloadbalancer
+        image: "{{ .Values.myloadbalancer.image.repository }}:{{ .Values.myloadbalancer.image.tag }}"
+        imagePullPolicy: {{ .Values.myloadbalancer.image.pullPolicy }}
+        ports:
+        - containerPort: 38412
+          name: loadbalancer
+        securityContext:
+          privileged: true
+
